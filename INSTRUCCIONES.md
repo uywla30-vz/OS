@@ -1,43 +1,33 @@
-# MiniOS Dart v0.2 - Guía de Usuario
+# MiniOS Dart v0.2.1 - Manual de Operaciones
 
-Este sistema es un Kernel real ejecutándose en Modo Largo (64-bit) sin dependencias de Linux o C.
+Este proyecto es la materialización de un sistema operativo Bare Metal donde la lógica central reside en **Dart**, soportada por una capa mínima de Assembly (HAT).
 
-## Novedades en v0.2
-- **Teclado Interactivo:** Se ha implementado un driver PS/2 en la capa HAT.
-- **Terminal Funcional:** Ahora puedes escribir comandos directamente.
-- **Comando `firm`:** Al escribir `firm` y presionar ENTER, el sistema muestra la versión y el autor.
+## Cambios en v0.2.1 (The Dart Core Update)
+- **Dart First**: El código en `kernel.dart` ahora define la arquitectura de la terminal y el procesamiento de comandos.
+- **HAT Robusto**: El driver de teclado en Assembly ha sido rediseñado para evitar desbordamientos y fallos de memoria (`r13` fix).
+- **Interactividad Real**: Se han añadido comandos `help`, `about` y `clear` (simulado) además de `firm`.
+- **Soporte de Teclado Completo**: Ahora puedes borrar (Backspace) y usar Espacios.
 
-## Requisitos del Sistema
-Para compilar y ejecutar este proyecto necesitas:
-- **QEMU** (`qemu-system-x86_64`)
-- **NASM** (El script `build.sh` lo descarga automáticamente si no está instalado)
-- **Dart SDK** (Para compilar la lógica del kernel)
-
-### Instalación de Dart en Linux (Ubuntu/Debian)
-```bash
-sudo apt-get update
-sudo apt-get install apt-transport-https
-wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/dart.gpg
-echo 'deb [signed-by=/usr/share/keyrings/dart.gpg arch=amd64] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main' | sudo tee /etc/apt/sources.list.d/dart.list
-sudo apt-get update
-sudo apt-get install dart
-export PATH="$PATH:/usr/lib/dart/bin"
-```
-
-## Cómo Probar la Interactividad
-1. Ejecuta el sistema en QEMU:
+## Cómo Ejecutar
+1. **Compilar**:
+   ```bash
+   ./build.sh
+   ```
+2. **Arrancar**:
    ```bash
    qemu-system-x86_64 -drive format=raw,file=os.img
    ```
-2. Una vez que veas el prompt `> `, escribe (en minúsculas):
-   `f` `i` `r` `m`
-3. Presiona la tecla **ENTER**.
-4. Verás aparecer en amarillo: `Version 0.1 - Creado por Emmanuel`.
 
-## Estructura Técnica
-- `boot.asm`: Paso de 16-bit a 64-bit y carga del kernel.
-- `hat.asm`: Capa de Abstracción de Hardware (VGA, Keyboard, I/O). Contiene el bucle principal de la terminal.
-- `kernel.dart`: Lógica de alto nivel (compilada a AOT para análisis e integración futura).
+## Comandos Disponibles en la Terminal
+Escribe estos comandos y presiona **ENTER**:
+- `firm`: Muestra la versión y el autor (Emmanuel).
+- `help`: Lista los comandos disponibles.
+- `dart`: **Comando Experimental**. Salta directamente al código máquina generado por el compilador de Dart (AOT) inyectado en el kernel.
+- `about`: Muestra la filosofía del proyecto.
+
+## Resolución de Problemas
+- **Pantalla Negra/Oscura**: Si al presionar una tecla la pantalla cambia, asegúrate de estar usando la versión `v0.2.1` donde se corrigió el fallo del registro `r13`.
+- **QEMU Accessibility Warning**: Ignora el mensaje de "Couldn't connect to accessibility bus", es un aviso de GTK en Linux que no afecta al emulador.
 
 ---
-*Emmanuel, este es el desarrollo de alto impacto prometido. Dart + Assembly en su estado más puro.*
+*Este sistema demuestra que Dart puede gobernar el hardware de forma segura y eficiente.*

@@ -7,6 +7,23 @@ Este sistema es un Kernel real ejecutándose en Modo Largo (64-bit) sin dependen
 - **Terminal Funcional:** Ahora puedes escribir comandos directamente.
 - **Comando `firm`:** Al escribir `firm` y presionar ENTER, el sistema muestra la versión y el autor.
 
+## Requisitos del Sistema
+Para compilar y ejecutar este proyecto necesitas:
+- **QEMU** (`qemu-system-x86_64`)
+- **NASM** (El script `build.sh` lo descarga automáticamente si no está instalado)
+- **Dart SDK** (Para compilar la lógica del kernel)
+
+### Instalación de Dart en Linux (Ubuntu/Debian)
+```bash
+sudo apt-get update
+sudo apt-get install apt-transport-https
+wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/dart.gpg
+echo 'deb [signed-by=/usr/share/keyrings/dart.gpg arch=amd64] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main' | sudo tee /etc/apt/sources.list.d/dart.list
+sudo apt-get update
+sudo apt-get install dart
+export PATH="$PATH:/usr/lib/dart/bin"
+```
+
 ## Cómo Probar la Interactividad
 1. Ejecuta el sistema en QEMU:
    ```bash

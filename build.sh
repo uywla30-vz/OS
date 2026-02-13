@@ -12,22 +12,29 @@ if [ ! -f "./nasm" ]; then
     cp .tmp/usr/bin/nasm ./nasm
 fi
 
-# 2. Compilar Dart (AOT) para análisis
+# 2. Verificar Dart SDK
+if ! command -v dart &> /dev/null; then
+    echo "ERROR: Dart SDK no encontrado."
+    echo "Por favor, instala Dart siguiendo las instrucciones en INSTRUCCIONES.md"
+    exit 1
+fi
+
+# 3. Compilar Dart (AOT) para análisis
 echo "Compilando Dart a AOT..."
 dart compile aot-snapshot kernel.dart
 
-# 3. Ensamblar componentes
+# 4. Ensamblar componentes
 echo "Ensamblando Bootloader y HAT..."
 ./nasm -f bin boot.asm -o boot.bin
 ./nasm -f elf64 hat.asm -o hat.o
 
-# 4. Enlazar Kernel
+# 5. Enlazar Kernel
 echo "Enlazando Kernel (HAT + Dart Stub)..."
 # Usamos el HAT como punto de entrada principal en 0x8000
 ld -m elf_x86_64 -Ttext 0x8000 hat.o -o kernel.elf
 objcopy -O binary kernel.elf kernel.bin
 
-# 5. Construir Imagen
+# 6. Construir Imagen
 echo "Generando os.img..."
 cat boot.bin kernel.bin > os.img
 truncate -s 1440k os.img

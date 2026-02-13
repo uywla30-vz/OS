@@ -9,7 +9,7 @@ _start:
     ; --- Inicialización de Entorno ---
     cli
 
-    ; Vaciar buffer de teclado inicial
+    ; Vaciar buffer de teclado inicial para evitar "teclas fantasma"
 .clear_kbd:
     in al, 0x64
     test al, 1
@@ -20,51 +20,53 @@ _start:
 
     mov rsp, 0x90000
     mov rbp, rsp
-    xor r13, r13            ; Buffer index
-    xor r12, r12            ; Cursor index
+    xor r13, r13            ; Indice del buffer de comandos
+    mov r12, 0xB8000        ; Cursor de video (CRÍTICO: Apuntar a memoria VGA, no a 0)
 
-    ; Limpiar pantalla
-    mov rdi, 0x1F ; Azul
+    ; Limpiar pantalla (Azul)
+    mov rdi, 0x1F ; Blanco sobre azul
     call clearScreen
 
-    ; Bienvenida
-    mov rdi, 0xB8000
+    ; Título e Información
     mov rsi, msg_welcome
     mov rdx, 0x1F
     call printString
 
-    ; Prompt
+    ; Prompt inicial
     call next_line
     mov rsi, msg_prompt
     mov rdx, 0x1F
     call printString
 
-    ; Guardar posición inicial del cursor para comandos
-    mov r12, rdi
-
 terminal_loop:
+    ; 1. Polling del teclado
     call kbd_get_scancode
     test al, al
     jz terminal_loop
 
-    test al, 0x80           ; Ignorar Release
+    ; 2. Solo procesar "Key Press" (bit 7 es 0)
+    test al, 0x80
     jnz terminal_loop
 
+    ; 3. Convertir scancode a ASCII
     movzx rdi, al
     call kbd_to_ascii
     test al, al
     jz terminal_loop
 
-    cmp al, 10              ; ENTER
+    ; 4. Manejar ENTER
+    cmp al, 10
     je process_command
 
-    cmp al, 8               ; BACKSPACE
+    ; 5. Manejar BACKSPACE
+    cmp al, 8
     je handle_backspace
 
-    ; Mostrar y Guardar
+    ; 6. Evitar desbordamiento
     cmp r13, 63
     jge terminal_loop
 
+    ; 7. Eco en pantalla y guardar
     mov [cmd_buffer + r13], al
     inc r13
 
@@ -91,20 +93,30 @@ process_command:
     mov byte [cmd_buffer + r13], 0
     call next_line
 
-    ; Comandos
+    ; --- Parser de Comandos ---
     mov rsi, cmd_buffer
 
-    ; Comparar "firm"
+    ; firm
     mov rdi, str_firm
     call strcmp
     jc .is_firm
 
-    ; Comparar "dart"
+    ; dart
     mov rdi, str_dart
     call strcmp
     jc .run_dart
 
-    ; Desconocido
+    ; help
+    mov rdi, str_help
+    call strcmp
+    jc .show_help
+
+    ; vfs
+    mov rdi, str_vfs
+    call strcmp
+    jc .show_vfs
+
+    ; Comando desconocido
     mov rsi, msg_unknown
     mov rdx, 0x1C ; Rojo
     call printString
@@ -120,26 +132,39 @@ process_command:
     mov rsi, msg_running_dart
     mov rdx, 0x1A ; Verde
     call printString
-
-    ; --- SALTO AL CÓDIGO DART EXTRAÍDO ---
-    ; El código de Dart está incluido al final del kernel.
-    ; Saltamos a la dirección donde lo hayamos cargado/incluido.
     call next_line
+    ; Salto experimental al código de Dart
     jmp dart_entry
 
+.show_help:
+    mov rsi, msg_help
+    mov rdx, 0x1B ; Cyan
+    call printString
+    jmp .done
+
+.show_vfs:
+    mov rsi, msg_vfs
+    mov rdx, 0x13 ; Magenta
+    call printString
+    jmp .done
+
 .done:
+    ; Resetear buffer y longitud
     xor r13, r13
+    mov rcx, 64
+.clear_buf:
+    mov byte [cmd_buffer + rcx - 1], 0
+    loop .clear_buf
+
     call next_line
     mov rsi, msg_prompt
     mov rdx, 0x1F
     call printString
-    mov r12, rdi
     jmp terminal_loop
 
-; --- Funciones del HAT ---
+; --- Funciones de Sistema (HAT) ---
 
 strcmp:
-    ; RSI: buffer, RDI: constant
     push rsi
     push rdi
 .loop:
@@ -163,35 +188,42 @@ strcmp:
     ret
 
 printString:
-    mov rdi, r12
+    ; RSI: source string, RDX: color (r12 is destination)
 .loop:
     movzx rax, byte [rsi]
     test al, al
     jz .done
     push rsi
     mov rsi, rax
+    mov rdi, r12
     call drawChar
     pop rsi
-    add rdi, 2
+    add r12, 2
     inc rsi
     jmp .loop
 .done:
-    mov r12, rdi
     ret
 
 next_line:
+    push rax
+    push rbx
+    push rdx
     mov rax, r12
     sub rax, 0xB8000
     xor rdx, rdx
     mov rbx, 160
-    div rbx
-    inc rax
+    div rbx                 ; rax = línea actual
+    inc rax                 ; rax = siguiente línea
     mul rbx
     add rax, 0xB8000
     mov r12, rax
+    pop rdx
+    pop rbx
+    pop rax
     ret
 
 drawChar:
+    ; RDI: addr, RSI: char, RDX: color
     mov rax, rdx
     shl rax, 8
     or rax, rsi
@@ -221,7 +253,6 @@ kbd_get_scancode:
     ret
 
 kbd_to_ascii:
-    ; Mapeo simplificado
     cmp rdi, 0x1E ; A
     je .a
     cmp rdi, 0x30 ; B
@@ -278,6 +309,8 @@ kbd_to_ascii:
     je .enter
     cmp rdi, 0x0E ; BACKSPACE
     je .backspace
+    cmp rdi, 0x39 ; SPACE
+    je .space
     xor al, al
     ret
 .a: mov al, 'a'; ret
@@ -308,21 +341,25 @@ kbd_to_ascii:
 .z: mov al, 'z'; ret
 .enter: mov al, 10; ret
 .backspace: mov al, 8; ret
+.space: mov al, ' '; ret
 
 section .data
-    msg_welcome db "MiniOS DART v0.2.1 - Interactive Shell", 0
+    msg_welcome db "MiniOS DART Kernel v0.3 - Terminal Activa", 0
     msg_prompt  db "> ", 0
     msg_firm    db "Version 0.1 - Creado por Emmanuel", 0
-    msg_unknown db "Comando desconocido.", 0
-    msg_running_dart db "Saltando al runtime de Dart...", 0
+    msg_help    db "Comandos: firm, dart, help, vfs", 0
+    msg_vfs     db "VFS (Dart managed): /dev/vga0, /sys/version, /home/emmanuel", 0
+    msg_unknown db "Comando no reconocido.", 0
+    msg_running_dart db "Ejecutando runtime de Dart (AOT Section)...", 0
 
     str_firm    db "firm", 0
     str_dart    db "dart", 0
+    str_help    db "help", 0
+    str_vfs     db "vfs", 0
 
     cmd_buffer times 64 db 0
 
 section .rodata
-    ; Incluir físicamente el código de Dart extraído
     align 4096
 dart_entry:
     incbin "dart_code.bin"

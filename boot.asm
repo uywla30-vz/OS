@@ -14,14 +14,35 @@ _start:
 
     mov [BOOT_DRIVE], dl        ; Guardar unidad de arranque
 
-    ; Cargar el kernel desde el disco (empezando en sector 2)
+    ; Cargar el kernel desde el disco (Carga extendida para el Runtime de Dart)
+    ; Cargaremos 600 sectores (~300 KB) para asegurar que el AOT entre completo
     mov bx, 0x8000
+    mov dh, 0x00            ; Cabezal 0
+    mov ch, 0x00            ; Cilindro 0
+    mov cl, 0x02            ; Empezar en sector 2
+
+    ; Bucle de carga (BIOS int 13h puede fallar si pedimos demasiado de golpe)
+    mov si, 10              ; Intentar cargar en bloques de 60 sectores
+.load_loop:
+    push si
     mov ah, 0x02
-    mov al, 30                  ; Leer 30 sectores (suficiente para el kernel)
-    mov ch, 0x00
-    mov dh, 0x00
-    mov cl, 0x02
+    mov al, 60
     int 0x13
+    jc .error_disk
+    add bx, 0x7800          ; Desplazar buffer (60 * 512 = 30720 bytes = 0x7800)
+    add cl, 60
+    ; Nota: Esto es simplificado y no maneja cambio de cilindro/cabezal
+    ; pero para una imagen de 1.44MB floppy en QEMU suele bastar.
+    pop si
+    dec si
+    jnz .load_loop
+    jmp .done_load
+
+.error_disk:
+    mov al, 'D'
+    jmp error
+
+.done_load:
 
     ; --- Verificar soporte de CPUID ---
     pushfd

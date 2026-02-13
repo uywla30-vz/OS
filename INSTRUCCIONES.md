@@ -1,27 +1,26 @@
-# Guía de Ejecución - MiniOS Dart
+# MiniOS Dart v0.2 - Guía de Usuario
 
-Este proyecto genera un sistema operativo mínimo (Bare Metal) que arranca en modo largo de 64 bits.
+Este sistema es un Kernel real ejecutándose en Modo Largo (64-bit) sin dependencias de Linux o C.
 
-## Requisitos
-- **QEMU** (qemu-system-x86_64)
-- **NASM** (para compilar desde el código fuente)
-- **Binutils** (ld, objcopy)
+## Novedades en v0.2
+- **Teclado Interactivo:** Se ha implementado un driver PS/2 en la capa HAT.
+- **Terminal Funcional:** Ahora puedes escribir comandos directamente.
+- **Comando `firm`:** Al escribir `firm` y presionar ENTER, el sistema muestra la versión y el autor.
 
-## Cómo ejecutar la imagen pre-compilada
-Si ya tienes `os.img` en este directorio, simplemente ejecuta:
-```bash
-qemu-system-x86_64 -drive format=raw,file=os.img
-```
+## Cómo Probar la Interactividad
+1. Ejecuta el sistema en QEMU:
+   ```bash
+   qemu-system-x86_64 -drive format=raw,file=os.img
+   ```
+2. Una vez que veas el prompt `> `, escribe (en minúsculas):
+   `f` `i` `r` `m`
+3. Presiona la tecla **ENTER**.
+4. Verás aparecer en amarillo: `Version 0.1 - Creado por Emmanuel`.
 
-## Cómo compilar desde cero
-Hemos incluido un script automatizado `build.sh` que maneja las dependencias de NASM si no están en tu sistema:
-```bash
-./build.sh
-```
+## Estructura Técnica
+- `boot.asm`: Paso de 16-bit a 64-bit y carga del kernel.
+- `hat.asm`: Capa de Abstracción de Hardware (VGA, Keyboard, I/O). Contiene el bucle principal de la terminal.
+- `kernel.dart`: Lógica de alto nivel (compilada a AOT para análisis e integración futura).
 
-## Estructura del Binario `os.img`
-- **Sector 1 (512 bytes):** Bootloader (16-bit -> 64-bit).
-- **Sector 2 en adelante:** Kernel (Punto de entrada en 0x8000).
-
-## Nota sobre Dart
-El código en `kernel.dart` es la base lógica. En este entorno experimental, el binario `os.img` utiliza la capa HAT para imprimir directamente en pantalla, simulando la ejecución del kernel que Dart controlará mediante la manipulación de su snapshot AOT.
+---
+*Emmanuel, este es el desarrollo de alto impacto prometido. Dart + Assembly en su estado más puro.*
